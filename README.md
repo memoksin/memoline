@@ -1,6 +1,6 @@
 # memoline
 
-A custom, color-coded, two-line status line for [Claude Code](https://docs.claude.com/en/docs/claude-code/statusline), installed once at the user level so it works in every project on every machine you run it on.
+A custom, color-coded, three-line status line for [Claude Code](https://docs.claude.com/en/docs/claude-code/statusline), installed once at the user level so it works in every project on every machine you run it on. No dependencies — not even Node.js.
 
 ## What it shows
 
@@ -27,48 +27,66 @@ Colors follow simple thresholds:
 
 Claude Code pipes every metric shown here (model, context tokens, effort, repo name, rate-limit usage) directly into the script via stdin. There's no public API for these numbers to call, so there's nothing to authenticate against and nothing to configure.
 
-## Works on every OS
+## Zero dependencies
 
-The installer and renderer are plain Node.js — no `jq`, no shell scripting, no OS-specific branches. Since Claude Code itself requires Node.js, there's nothing extra to install. Tested on macOS, Linux, and Windows.
+Nothing to install first — not even Node.js. Every OS already ships a runtime that can do the job, so there are two implementations that use only what's guaranteed present:
+
+| Platform | Renderer | Needs | Ships with the OS |
+|---|---|---|---|
+| macOS, Linux, BSD | `statusline.sh` | POSIX `sh` + `awk` | Yes, both POSIX-mandated |
+| Windows 10/11 | `statusline.ps1` | Windows PowerShell 5.1 | Yes, `ConvertFrom-Json` is built in |
+
+No `jq`, no Node.js, no Python, no Git Bash. This matters because Claude Code's native Windows installer bundles no user-facing `node` — a Node-based status line silently renders blank there.
+
+**Your shell doesn't matter.** bash, zsh, fish, cmd.exe and PowerShell all merely *invoke* the renderer, so there's nothing to pick — the installer detects the OS and wires an absolute interpreter path that parses identically in all of them.
 
 ## Installation
 
-```bash
-node install_statusline.js
+**macOS / Linux / BSD:**
+```sh
+sh install.sh
 ```
 
-This will:
+**Windows:**
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+Either one will:
 1. Ask before overwriting an existing status line configuration.
-2. Write the renderer to `~/.claude/statusline.js`.
-3. Merge a `statusLine` entry into `~/.claude/settings.json` (without touching your other settings).
+2. Write the renderer into `~/.claude/`.
+3. Merge a `statusLine` entry into `~/.claude/settings.json`, preserving every other key (a `.bak` is written first, and an unparseable file aborts the install rather than being clobbered).
 4. If run inside a git repo, add `.env` and `.claude/settings.local.json` to `.gitignore`.
+5. **Self-test the wired command through a shell** and fail loudly if it doesn't render three lines — a broken status line is otherwise completely silent.
 
 Restart Claude Code afterward to see it in action.
 
 ## Previewing without installing
 
-You can test the renderer directly against a sample payload:
-
-```bash
-echo '<session-json>' | node statusline.js
+```sh
+echo '<session-json>' | sh statusline.sh
 ```
 
 On Windows PowerShell:
 
 ```powershell
-'<session-json>' | node statusline.js
+'<session-json>' | powershell -NoProfile -File .\statusline.ps1
 ```
 
 ## Debugging
 
 To inspect the raw JSON Claude Code sends to the status line:
 
-```bash
+```sh
 touch ~/.claude/.statusline-debug
 # next render writes payload to:
 cat ~/.claude/.statusline-payload.json
 ```
 
+On Windows, create the flag with `New-Item ~/.claude/.statusline-debug`.
+
+If the status line is blank, re-run the installer and read its `self-test:` line — it runs the exact command Claude Code will run and prints the real error.
+
 ## Uninstalling
 
-Remove the `statusLine` key from `~/.claude/settings.json` and delete `~/.claude/statusline.js`.
+Remove the `statusLine` key from `~/.claude/settings.json` and delete `~/.claude/statusline.sh` (or `statusline.ps1`).
