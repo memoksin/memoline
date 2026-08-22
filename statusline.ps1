@@ -8,7 +8,7 @@
 #
 # Line 1: Model | Used/Total | Used%(color) used Tok | Remaining%(color) remain Tok
 # Line 2: effort: Effort | repo: Repo
-# Line 3: Current Usage Limit: Used%/100%(color) | Weekly Usage Limit: ...
+# Line 3: Current Usage Limit: Used%/100%(color) (resets in Xh Ym) | Weekly Usage Limit: ...
 #
 # Color coding:
 #   "used"      semantics (higher = worse):  green < 50%, yellow 50-80%, red >= 80%
@@ -67,10 +67,25 @@ function Format-Human([double]$n) {
 function Get-ColorUsed([double]$p) { if ($p -ge 80) { $RED } elseif ($p -ge 50) { $YELLOW } else { $GREEN } }
 function Get-ColorRem([double]$p)  { if ($p -le 20) { $RED } elseif ($p -le 50) { $YELLOW } else { $GREEN } }
 
-function Format-Limit([string]$label, $used) {
+function Format-Duration([double]$sec) {
+  if ($sec -lt 0) { $sec = 0 }
+  $d = [math]::Truncate($sec / 86400); $sec -= $d * 86400
+  $h = [math]::Truncate($sec / 3600);  $sec -= $h * 3600
+  $m = [math]::Truncate($sec / 60)
+  if ($d -gt 0) { return "${d}d ${h}h" }
+  if ($h -gt 0) { return "${h}h ${m}m" }
+  return "${m}m"
+}
+
+function Format-Limit([string]$label, $used, $resetsAt) {
   if ($null -eq $used) { return "${label}: ${GREY}n/a${RESET}" }
   $c = Get-ColorUsed $used
-  return "${label}: ${c}${used}%${RESET} / ${GREEN}100%${RESET}"
+  $out = "${label}: ${c}${used}%${RESET} / ${GREEN}100%${RESET}"
+  if ($resetsAt) {
+    $remaining = [double]$resetsAt - [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $out += " ${GREY}(resets $(Format-Duration $remaining))${RESET}"
+  }
+  return $out
 }
 
 $model = Get-Path $data @('model', 'display_name')
@@ -97,8 +112,10 @@ if (-not $repo) {
   if (-not $repo) { $repo = '(no repo)' }
 }
 
-$fiveUsed  = Get-Path $data @('rate_limits', 'five_hour', 'used_percentage')
-$sevenUsed = Get-Path $data @('rate_limits', 'seven_day', 'used_percentage')
+$fiveUsed   = Get-Path $data @('rate_limits', 'five_hour', 'used_percentage')
+$sevenUsed  = Get-Path $data @('rate_limits', 'seven_day', 'used_percentage')
+$fiveReset  = Get-Path $data @('rate_limits', 'five_hour', 'resets_at')
+$sevenReset = Get-Path $data @('rate_limits', 'seven_day', 'resets_at')
 
 $SEP = "${GREY} | ${RESET}"
 $cu  = Get-ColorUsed $usedPct
@@ -114,8 +131,8 @@ $line1 += "${SEP}${cr}${remPctStr}%${RESET} ${GREY}remain${RESET} $(Format-Human
 
 $line2  = "${GREY}effort:${RESET} ${MAGENTA}${effort}${RESET}${SEP}${GREY}repo:${RESET} ${repo}"
 
-$line3  = Format-Limit 'Current Usage Limit' $fiveUsed
-$line3 += "${SEP}$(Format-Limit 'Weekly Usage Limit' $sevenUsed)"
+$line3  = Format-Limit 'Current Usage Limit' $fiveUsed $fiveReset
+$line3 += "${SEP}$(Format-Limit 'Weekly Usage Limit' $sevenUsed $sevenReset)"
 
 # Write-Output would append the host's line ending and can wrap; emit directly.
 [Console]::Out.Write("$line1`n$line2`n$line3`n")

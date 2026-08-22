@@ -9,7 +9,7 @@
 #
 # Line 1: Model | Used/Total | Used%(color) used Tok | Remaining%(color) remain Tok
 # Line 2: effort: Effort | repo: Repo
-# Line 3: Current Usage Limit: Used%/100%(color) | Weekly Usage Limit: ...
+# Line 3: Current Usage Limit: Used%/100%(color) (resets in Xh Ym) | Weekly Usage Limit: ...
 #
 # Color coding:
 #   "used"      semantics (higher = worse):  green < 50%, yellow 50-80%, red >= 80%
@@ -23,7 +23,7 @@ export LC_ALL
 HOME_DIR="${HOME:-.}"
 
 render() {
-  awk '
+  awk -v now="$(date -u +%s)" '
 # ---- JSON helpers -----------------------------------------------------------
 # The session schema is shallow and its key names are unique, so isolating a
 # flat object by name and reading leaf keys out of it is sufficient. Anything
@@ -92,9 +92,21 @@ function base(p,   n, a) {
 function colorUsed(p) { return p >= 80 ? RED : (p >= 50 ? YELLOW : GREEN) }
 function colorRem(p)  { return p <= 20 ? RED : (p <= 50 ? YELLOW : GREEN) }
 
-function fmtLimit(label, used) {
+function fmtDuration(sec,   d, h, m) {
+  if (sec < 0) sec = 0
+  d = int(sec / 86400); sec -= d * 86400
+  h = int(sec / 3600);  sec -= h * 3600
+  m = int(sec / 60)
+  if (d > 0) return d "d " h "h"
+  if (h > 0) return h "h " m "m"
+  return m "m"
+}
+
+function fmtLimit(label, used, resetsAt,   out) {
   if (used < 0) return label ": " GREY "n/a" RESET
-  return label ": " colorUsed(used) used "%" RESET " / " GREEN "100%" RESET
+  out = label ": " colorUsed(used) used "%" RESET " / " GREEN "100%" RESET
+  if (resetsAt > 0) out = out " " GREY "(resets " fmtDuration(resetsAt - now) ")" RESET
+  return out
 }
 
 # ---- main -------------------------------------------------------------------
@@ -138,8 +150,10 @@ END {
     if (repo == "") repo = "(no repo)"
   }
 
-  fiveUsed  = num(o5h, "used_percentage", -1)
-  sevenUsed = num(o7d, "used_percentage", -1)
+  fiveUsed   = num(o5h, "used_percentage", -1)
+  sevenUsed  = num(o7d, "used_percentage", -1)
+  fiveReset  = num(o5h, "resets_at", -1)
+  sevenReset = num(o7d, "resets_at", -1)
 
   SEP = GREY " | " RESET
   cu = colorUsed(usedPct)
@@ -152,7 +166,7 @@ END {
 
   line2 = GREY "effort:" RESET " " MAGENTA effort RESET SEP GREY "repo:" RESET " " repo
 
-  line3 = fmtLimit("Current Usage Limit", fiveUsed) SEP fmtLimit("Weekly Usage Limit", sevenUsed)
+  line3 = fmtLimit("Current Usage Limit", fiveUsed, fiveReset) SEP fmtLimit("Weekly Usage Limit", sevenUsed, sevenReset)
 
   printf "%s\n%s\n%s\n", line1, line2, line3
 }
