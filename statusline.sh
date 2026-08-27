@@ -8,7 +8,7 @@
 # Unix. No node, no jq, no python, no bashisms.
 #
 # Line 1: Model | Used/Total | Used%(color) used Tok | Remaining%(color) remain Tok
-# Line 2: effort: Effort | repo: Repo
+# Line 2: effort: Effort | repo: Repo (branch)
 # Line 3: Current Usage Limit: Used%/100%(color) (resets in Xh Ym) | Weekly Usage Limit: ...
 #
 # Color coding:
@@ -89,6 +89,24 @@ function base(p,   n, a) {
   return n > 0 ? a[n] : ""
 }
 
+# Double-quote for safe embedding in a shell command string.
+function shquote(s) {
+  gsub(/\\/, "\\\\", s)
+  gsub(/"/, "\\\"", s)
+  gsub(/\$/, "\\$", s)
+  gsub(/`/, "\\`", s)
+  return "\"" s "\""
+}
+
+# Current git branch in dir, or "" if not a repo / git missing.
+function gitBranch(dir,   cmd, out) {
+  if (dir == "") return ""
+  cmd = "git -C " shquote(dir) " branch --show-current 2>/dev/null"
+  cmd | getline out
+  close(cmd)
+  return out
+}
+
 function colorUsed(p) { return p >= 80 ? RED : (p >= 50 ? YELLOW : GREEN) }
 function colorRem(p)  { return p <= 20 ? RED : (p <= 50 ? YELLOW : GREEN) }
 
@@ -142,13 +160,17 @@ END {
   effort = str(oEff, "level")
   if (effort == "" || effort == "null") effort = "n/a"
 
+  cwd = str(oWork, "current_dir")
+  if (cwd == "" || cwd == "null") cwd = str(doc, "cwd")
+  if (cwd == "null") cwd = ""
+
   repo = str(oRepo, "name")
   if (repo == "" || repo == "null") {
-    cwd = str(oWork, "current_dir")
-    if (cwd == "" || cwd == "null") cwd = str(doc, "cwd")
-    repo = (cwd == "" || cwd == "null") ? "(no repo)" : base(cwd)
+    repo = (cwd == "") ? "(no repo)" : base(cwd)
     if (repo == "") repo = "(no repo)"
   }
+
+  branch = gitBranch(cwd)
 
   fiveUsed   = num(o5h, "used_percentage", -1)
   sevenUsed  = num(o7d, "used_percentage", -1)
@@ -165,6 +187,7 @@ END {
   line1 = line1 SEP cr sprintf("%.2f", remPct)  "%" RESET " " GREY "remain" RESET " " hum(remTokens)
 
   line2 = GREY "effort:" RESET " " MAGENTA effort RESET SEP GREY "repo:" RESET " " repo
+  if (branch != "") line2 = line2 " " GREY "(" RESET CYAN branch RESET GREY ")" RESET
 
   line3 = fmtLimit("Current Usage Limit", fiveUsed, fiveReset) SEP fmtLimit("Weekly Usage Limit", sevenUsed, sevenReset)
 

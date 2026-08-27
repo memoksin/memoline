@@ -7,7 +7,7 @@
 # ConvertFrom-Json built in. No node, no jq, no python.
 #
 # Line 1: Model | Used/Total | Used%(color) used Tok | Remaining%(color) remain Tok
-# Line 2: effort: Effort | repo: Repo
+# Line 2: effort: Effort | repo: Repo (branch)
 # Line 3: Current Usage Limit: Used%/100%(color) (resets in Xh Ym) | Weekly Usage Limit: ...
 #
 # Color coding:
@@ -104,12 +104,21 @@ $remTokens = $ctxSize - $usedTokens
 $effort = Get-Path $data @('effort', 'level')
 if (-not $effort) { $effort = 'n/a' }
 
+$cwd = Get-Path $data @('workspace', 'current_dir')
+if (-not $cwd) { $cwd = Get-Path $data @('cwd') }
+
 $repo = Get-Path $data @('workspace', 'repo', 'name')
 if (-not $repo) {
-  $cwd = Get-Path $data @('workspace', 'current_dir')
-  if (-not $cwd) { $cwd = Get-Path $data @('cwd') }
   if ($cwd) { $repo = Split-Path -Leaf ($cwd.TrimEnd('\', '/')) }
   if (-not $repo) { $repo = '(no repo)' }
+}
+
+$branch = ''
+if ($cwd) {
+  try {
+    $branch = & git -C $cwd branch --show-current 2>$null
+    if ($LASTEXITCODE -ne 0) { $branch = '' }
+  } catch { $branch = '' }
 }
 
 $fiveUsed   = Get-Path $data @('rate_limits', 'five_hour', 'used_percentage')
@@ -130,6 +139,7 @@ $line1 += "${SEP}${cu}${usedPctStr}%${RESET} ${GREY}used${RESET} $(Format-Human 
 $line1 += "${SEP}${cr}${remPctStr}%${RESET} ${GREY}remain${RESET} $(Format-Human $remTokens)"
 
 $line2  = "${GREY}effort:${RESET} ${MAGENTA}${effort}${RESET}${SEP}${GREY}repo:${RESET} ${repo}"
+if ($branch) { $line2 += " ${GREY}(${RESET}${CYAN}${branch}${RESET}${GREY})${RESET}" }
 
 $line3  = Format-Limit 'Current Usage Limit' $fiveUsed $fiveReset
 $line3 += "${SEP}$(Format-Limit 'Weekly Usage Limit' $sevenUsed $sevenReset)"
