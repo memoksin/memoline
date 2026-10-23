@@ -40,6 +40,19 @@ No `jq`, no Node.js, no Python, no Git Bash. This matters because Claude Code's 
 
 **Your shell doesn't matter.** bash, zsh, fish, cmd.exe and PowerShell all merely *invoke* the renderer, so there's nothing to pick — the installer detects the OS and wires an absolute interpreter path that parses identically in all of them.
 
+## Pi / OMP status line
+
+For [OMP](https://github.com/can1357/oh-my-pi), run `sh install-pi.sh` and restart `omp`.
+This installs `pi-statusline.ts` into your user-level `~/.omp/agent/extensions/` and selects
+the Memoline composer shape. The Claude Code installer and renderer are unchanged.
+
+The Pi extension draws the same three colored rows below the prompt. Model, context
+occupancy, effort, and repository come from the active Pi session. The last row runs
+`omp usage --json --provider <selected-model-provider>` (at most once per minute),
+displaying that provider's 5-hour and weekly quotas; unavailable windows show `n/a`.
+Antigravity's Gemini and shared Claude/GPT pools are selected by model. No credentials
+are stored in the extension; OMP handles its own authenticated usage lookup.
+
 ## Installation
 
 **macOS / Linux / BSD:**
@@ -90,3 +103,6 @@ If the status line is blank, re-run the installer and read its `self-test:` line
 ## Uninstalling
 
 Remove the `statusLine` key from `~/.claude/settings.json` and delete `~/.claude/statusline.sh` (or `statusline.ps1`).
+
+For Pi / OMP, run `omp config set composer.shape claude` and remove
+`~/.omp/agent/extensions/memoline.ts`.
