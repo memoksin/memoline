@@ -193,7 +193,7 @@ merge_settings() {
       i = skipws(doc, 1)
       rest = substr(doc, i + 1)
       sep = (substr(rest, skipws(rest, 1), 1) == "}") ? "" : ","
-      entry = "\n  \"statusLine\": {\n    \"type\": \"command\",\n    \"command\": \"" esc(cmd) "\",\n    \"padding\": 0\n  }" sep
+      entry = "\n  \"statusLine\": {\n    \"type\": \"command\",\n    \"command\": \"" esc(cmd) "\",\n    \"padding\": 0,\n    \"refreshInterval\": 10\n  }" sep
       printf "%s%s%s", substr(doc, 1, i), entry, rest
     }
   '
@@ -209,7 +209,7 @@ if [ -f "$SETTINGS" ] && [ -s "$SETTINGS" ]; then
   mv "$SETTINGS.tmp" "$SETTINGS"
   printf '  ✓ wired statusLine → %s (backup: %s.bak)\n' "$SETTINGS" "$SETTINGS"
 else
-  printf '{\n  "statusLine": {\n    "type": "command",\n    "command": "%s",\n    "padding": 0\n  }\n}\n' \
+  printf '{\n  "statusLine": {\n    "type": "command",\n    "command": "%s",\n    "padding": 0,\n    "refreshInterval": 10\n  }\n}\n' \
     "$(printf '%s' "$COMMAND" | sed 's/\\/\\\\/g; s/"/\\"/g')" > "$SETTINGS"
   printf '  ✓ wired statusLine → %s\n' "$SETTINGS"
 fi

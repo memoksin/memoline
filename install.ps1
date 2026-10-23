@@ -91,7 +91,7 @@ $quoted  = if ($statusScript -match ' ') { '"' + $statusScript + '"' } else { $s
 $command = "powershell -NoProfile -ExecutionPolicy Bypass -File $quoted"
 
 # --- Merge statusLine into settings.json, preserving every other key ---
-$entry = [PSCustomObject]@{ type = 'command'; command = $command; padding = 0 }
+$entry = [PSCustomObject]@{ type = 'command'; command = $command; padding = 0; refreshInterval = 10 }
 
 $root = $null
 if ((Test-Path $settings) -and (Get-Item $settings).Length -gt 0) {

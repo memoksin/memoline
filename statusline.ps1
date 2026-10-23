@@ -7,7 +7,7 @@
 # ConvertFrom-Json built in. No node, no jq, no python.
 #
 # Line 1: Model | Used/Total | Used%(color) used Tok | Remaining%(color) remain Tok
-# Line 2: effort: Effort | repo: Repo (branch)
+# Line 2: effort: Effort | repo: Repo (branch) | cache: time left
 # Line 3: Current Usage Limit: Used%/100%(color) (resets in Xh Ym) | Weekly Usage Limit: ...
 #
 # Color coding:
@@ -88,6 +88,18 @@ function Format-Limit([string]$label, $used, $resetsAt) {
   return $out
 }
 
+# Prompt cache countdown, colored by the share of its TTL still left.
+function Format-Cache($pc) {
+  $ttl = Get-Path $pc @('ttl')
+  if (-not $ttl) { return '' }
+  $ttlSec = 0
+  if ($ttl -match '^(\d+)([hm])$') { $ttlSec = [double]$Matches[1] * $(if ($Matches[2] -eq 'h') { 3600 } else { 60 }) }
+  $left = (Get-Num $pc @('expires_at') 0) - [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+  if ((Get-Path $pc @('warm')) -ne $true -or $left -le 0) { return "${GREY}cache:${RESET} ${RED}cold${RESET}" }
+  $c = Get-ColorRem $(if ($ttlSec -gt 0) { $left * 100 / $ttlSec } else { 0 })
+  return "${GREY}cache:${RESET} ${c}$(if ($left -lt 60) { "$([math]::Truncate($left))s" } else { Format-Duration $left })${RESET}"
+}
+
 $model = Get-Path $data @('model', 'display_name')
 if (-not $model) { $model = 'Unknown' }
 
@@ -140,6 +152,8 @@ $line1 += "${SEP}${cr}${remPctStr}%${RESET} ${GREY}remain${RESET} $(Format-Human
 
 $line2  = "${GREY}effort:${RESET} ${MAGENTA}${effort}${RESET}${SEP}${GREY}repo:${RESET} ${repo}"
 if ($branch) { $line2 += " ${GREY}(${RESET}${CYAN}${branch}${RESET}${GREY})${RESET}" }
+$cache = Format-Cache (Get-Path $data @('prompt_cache'))
+if ($cache) { $line2 += "${SEP}${cache}" }
 
 $line3  = Format-Limit 'Current Usage Limit' $fiveUsed $fiveReset
 $line3 += "${SEP}$(Format-Limit 'Weekly Usage Limit' $sevenUsed $sevenReset)"

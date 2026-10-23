@@ -8,7 +8,7 @@
 # Unix. No node, no jq, no python, no bashisms.
 #
 # Line 1: Model | Used/Total | Used%(color) used Tok | Remaining%(color) remain Tok
-# Line 2: effort: Effort | repo: Repo (branch)
+# Line 2: effort: Effort | repo: Repo (branch) | cache: time left
 # Line 3: Current Usage Limit: Used%/100%(color) (resets in Xh Ym) | Weekly Usage Limit: ...
 #
 # Color coding:
@@ -127,6 +127,18 @@ function fmtLimit(label, used, resetsAt,   out) {
   return out
 }
 
+# Prompt cache countdown, colored by the share of its TTL still left.
+function fmtCache(o,   ttl, ttlSec, expAt, left) {
+  ttl = str(o, "ttl")
+  if (ttl == "" || ttl == "null") return ""
+  ttlSec = ttl + 0
+  if (ttl ~ /h$/) ttlSec *= 3600; else if (ttl ~ /m$/) ttlSec *= 60
+  expAt = num(o, "expires_at", 0)
+  left = expAt - now
+  if (str(o, "warm") != "true" || left <= 0) return GREY "cache:" RESET " " RED "cold" RESET
+  return GREY "cache:" RESET " " colorRem(ttlSec > 0 ? left * 100 / ttlSec : 0) (left < 60 ? int(left) "s" : fmtDuration(left)) RESET
+}
+
 # ---- main -------------------------------------------------------------------
 { doc = doc $0 }
 
@@ -143,6 +155,7 @@ END {
   oRepo  = obj(doc, "repo")
   o5h    = obj(doc, "five_hour")
   o7d    = obj(doc, "seven_day")
+  oCache = obj(doc, "prompt_cache")
 
   model = str(oModel, "display_name")
   if (model == "" || model == "null") model = "Unknown"
@@ -188,6 +201,8 @@ END {
 
   line2 = GREY "effort:" RESET " " MAGENTA effort RESET SEP GREY "repo:" RESET " " repo
   if (branch != "") line2 = line2 " " GREY "(" RESET CYAN branch RESET GREY ")" RESET
+  cache = fmtCache(oCache)
+  if (cache != "") line2 = line2 SEP cache
 
   line3 = fmtLimit("Current Usage Limit", fiveUsed, fiveReset) SEP fmtLimit("Weekly Usage Limit", sevenUsed, sevenReset)
 

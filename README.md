@@ -9,9 +9,9 @@ A custom, color-coded, three-line status line for [Claude Code](https://docs.cla
 Sonnet | 50.0k / 200.0k | 25.00% used 50.0k | 75.00% remain 150.0k
 ```
 
-**Line 2** — Reasoning effort and current repo:
+**Line 2** — Reasoning effort, current repo and branch, prompt cache time left (red `cold` once expired):
 ```
-effort: high | repo: memoline
+effort: high | repo: memoline (main) | cache: 42m
 ```
 
 **Line 3** — 5-hour and weekly rate-limit usage:
